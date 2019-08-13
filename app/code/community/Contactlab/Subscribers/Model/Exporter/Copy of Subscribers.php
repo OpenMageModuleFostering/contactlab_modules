@@ -22,6 +22,51 @@
  * @property array deletedEntities
  */
 class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commons_Model_Exporter_Abstract {
+    
+	public final function export() 
+	{		
+
+			$filenameFormat = Mage::getStoreConfig("contactlab_commons/connection/export_local_path")
+			. '/' . $this->getFileName();
+
+			$filename = $this->_formatFileName($filenameFormat);
+	
+		
+		
+		Mage::helper("contactlab_commons")->logNotice("Exporting locally to $filename");
+	
+		$path = dirname($filename);
+	
+		if (is_dir($path) && !is_writable($path)) {
+			Mage::helper("contactlab_commons")->logAlert("$path is not writeable");
+			throw new Zend_Exception("$path is not writeable");
+		}
+		if (is_file($filename) && !is_writable($filename)) {
+			Mage::helper("contactlab_commons")->logAlert("$filename is not writeable");
+			throw new Zend_Exception("$filename is not writeable");
+		}
+		if (($this->gz = gzopen($filename, 'w9')) === false) {
+			Mage::helper("contactlab_commons")->logAlert("Could not export to $filename");
+			throw new Zend_Exception("Could not export to $filename");
+		}
+	
+		gzwrite($this->gz, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<dataroot>\n");
+		$this->writeXml();
+		gzwrite($this->gz, "</dataroot>\n");
+		gzclose($this->gz);
+	/*
+		if ($this->_useRemoteServer()) {
+			$this->_putFile(realpath($filename), basename($realFilename));
+			sleep(2);
+			unlink(realpath($filename));
+		}
+		$this->afterFileCopy();
+	*/
+		return "Export done";
+	}
+	
+    
+    
     /**
      * Get xml object.
      */
@@ -34,7 +79,8 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
         $this->newsletterSubscribers = 0;
         $this->deleted = 0;
 
-        $this->exportPolicy = $this->getTask()->getConfig('contactlab_subscribers/global/export_policy');
+        //$this->exportPolicy = Mage::getStoreConfig('contactlab_subscribers/global/export_policy');
+        $this->exportPolicy = Mage::getStoreConfig('contactlab_subscribers/global/export_policy');
         $this->helper = Mage::helper("contactlab_subscribers/exporter");
         $this->resource = Mage::getSingleton('core/resource');
 
@@ -46,7 +92,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
         if ($this->_mustResetExportDates()) {
             $this->_resetExportDates();
         }
-
+        
         $this->customerAttributes = $this->helper->getAttributesCodesForEntityType('customer');
         $this->addressAttributes = $this->helper->getAttributesCodesForEntityType('customer_address');
 
@@ -55,23 +101,84 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
 
         $this->statsAttributesMap = $this->helper->getStatsAttributesMap();
         $this->stores = $this->_loadStores();
-
+        
         // Define customer collection
+        $attribute_map =  array(
+        		'prefix' => 'prefix',
+        		'firstname' => 'firstname',
+        		'middlename' => 'middlename',
+        		'lastname' => 'lastname',
+        		'suffix' => 'suffix',
+        		'dob' => 'dob',
+        		'gender' => 'gender',
+        		'email' => 'email',
+        		'created_at' => 'created_at',
+        		/**
+        		 * Adding new fields from extended newsletter subscription form
+        */
+        		'privacy' => 'privacy',
+        		'mobilephone' => 'mobilephone',
+        		'notes' => 'notes',
+        		'custom_1' => 'custom_1',
+        		'custom_2' => 'custom_2',
+        		'customer_group_id' => 'customer_group_id',
+        		'customer_group_name' => 'customer_group_name'
+        );
+        
+        $tMapTransporter = Mage::getModel('contactlab_subscribers/exporter_subscribers_mapTransporter_attribute');
+        $tMapTransporter->setMap($attribute_map);
+        $tMapTransporter->setIsMod(false);
+        
+        Mage::dispatchEvent("contactlab_export_attributesmap",array(
+        		'map_transporter' => $tMapTransporter
+        ));
+        
+        if ($tMapTransporter->isMod()){
+        	$attribute_map = $tMapTransporter->getMap();
+        }
+        
+        
+        
+        $address_attribute_map =  array(
+        		'country_id' => 'country_id',
+        		'country' => 'country',
+        		'region_id' => 'region_id',
+        		'region' => 'region',
+        		'postcode' => 'postcode',
+        		'city' => 'city',
+        		'street' => 'street',
+        		'telephone' => 'telephone',
+        		'fax' => 'fax',
+        		'company' => 'company',
+        );
+        
+        $tMapTransporter = Mage::getModel('contactlab_subscribers/exporter_subscribers_mapTransporter_address');
+        $tMapTransporter->setMap($address_attribute_map);
+        $tMapTransporter->setIsMod(false);
+        
+        Mage::dispatchEvent("contactlab_export_AddressesAttributesMap",array(
+        		'map_transporter' => $tMapTransporter
+        ));
+        
+        if ($tMapTransporter->isMod()){
+        	$address_attribute_map = $tMapTransporter->getMap();
+        }
+        
         $attributesCustomer = $this->helper->getAttributesForEntityType('customer',
-                array_keys($this->helper->getAttributesMap($this->getTask())));
-        $this->fAttributesMap = array_flip($this->helper->getAttributesMap($this->getTask()));
-        $this->fAddressAttributes = array_flip($this->helper->getAddressesAttributesMap());
-
+                array_keys($attribute_map));
+        $this->fAttributesMap = array_flip($attribute_map);
+        $this->fAddressAttributes = array_flip($address_attribute_map);
+        
         $counter = 0;
         $start = microtime(true);
         $max = $this->_createCounterSubscribersInCustomersCollection()->getSize();
-        $this->getTask()->setMaxValue($max);
+        ////$this->getTask()->setMaxValue($max);
         Mage::helper("contactlab_commons")->logNotice(sprintf("Counting time: %0.4f", microtime(true) - $start));
-
+        
         $customKeys = array();
         for ($ic = 1; $ic < 8; ++$ic) {
-            if ($this->getTask()->getConfigFlag("contactlab_subscribers/custom_fields/enable_field_" . $ic)) {
-                $customKeys[] = $this->getTask()->getConfig("contactlab_subscribers/custom_fields/field_" . $ic);
+            if (Mage::getStoreConfigFlag("contactlab_subscribers/custom_fields/enable_field_" . $ic)) {
+                $customKeys[] = Mage::getStoreConfig("contactlab_subscribers/custom_fields/field_" . $ic);
             }
         }
 
@@ -86,6 +193,8 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
             $subscribersInCustomers->getSelect()->limitPage($page, $limit);
             Mage::helper("contactlab_commons")->logDebug($subscribersInCustomers->getSelect()->assemble());
             $found = false;
+     
+            
             while ($item = $subscribersInCustomers->fetchItem()) {
                 $toFill = array();
                 $found = true;
@@ -93,22 +202,13 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
                 $toFill['is_customer'] = 1;
                 if (!$item->hasData('uk')) {
                     $msg = sprintf("FATAL ERROR, %s subscriber has no UK record!", $item->getData('email'));
-                    $this->getTask()->addEvent($msg, true);
+                    ////$this->getTask()->addEvent($msg, true);
                     throw new Exception($msg);
                 }
                 $toFill['entity_id'] = $item->getData('uk');
 
                 $toFill = array_merge($toFill, $preFilled);
                 $toFill['email'] = $item->getData('email');
-                
-                //FIX
-                $toFill['created_at'] = $item->getData('created_at');
-                if($item->getData('last_subscribed_at'))
-                {
-                	$toFill['created_at'] = $item->getData('last_subscribed_at');
-                }
-                                
-                
                 $this->_setAttributeKeys($toFill, $item);
                 $this->_setAddressesAttributeKeys($toFill, $item);
 
@@ -130,6 +230,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
                         $toFill[$icKey] = $icValue;
                     }
                 }
+                                
                 $this->found = true;
                 $this->customers++;
                 $writer = new XMLWriter();
@@ -148,11 +249,12 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
                     $writer->writeElement($k, $v);
                 }
                 $writer->endElement();
+                
                 gzwrite($this->gz, $writer->outputMemory());
 
                 if ($counter % 2000 == 0) {
                     Mage::helper("contactlab_commons")->logNotice(sprintf("Exporting %6s / %-6s", $counter, $max));
-                    $this->getTask()->setProgressValue($counter);
+                    //$this->getTask()->setProgressValue($counter);
                 }
             }
             $this->_setUkIsExported();
@@ -170,16 +272,16 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
 
         Mage::helper("contactlab_commons")->flushDbProfiler();
         if (!$this->found) {
-            $this->getTask()->addEvent("No record exported or deleted");
+            ////$this->getTask()->addEvent("No record exported or deleted");
         } else {
             if ($this->customers > 0) {
-                $this->getTask()->addEvent(sprintf("%d customers exported", $this->customers));
+                ////$this->getTask()->addEvent(sprintf("%d customers exported", $this->customers));
             }
             if ($this->newsletterSubscribers > 0) {
-                $this->getTask()->addEvent(sprintf("%d newsletter subscribers exported", $this->newsletterSubscribers));
+                ////$this->getTask()->addEvent(sprintf("%d newsletter subscribers exported", $this->newsletterSubscribers));
             }
             if ($this->deleted > 0) {
-                $this->getTask()->addEvent(sprintf("%d record deleted", $this->deleted));
+                ////$this->getTask()->addEvent(sprintf("%d record deleted", $this->deleted));
             }
         }
     }
@@ -286,13 +388,13 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
         $subscribersNotInCustomers = $this->_createSubscribersNotInCustomers();
         $customKeys = array();
         for ($ic = 1; $ic < 8; ++$ic) {
-            if ($this->getTask()->getConfigFlag("contactlab_subscribers/custom_fields/enable_field_" . $ic)) {
-                $customKeys[] = $this->getTask()->getConfig("contactlab_subscribers/custom_fields/field_" . $ic);
+            if (Mage::getStoreConfigFlag("contactlab_subscribers/custom_fields/enable_field_" . $ic)) {
+                $customKeys[] = Mage::getStoreConfig("contactlab_subscribers/custom_fields/field_" . $ic);
             }
         }
         $counter = 0;
         $max = $subscribersNotInCustomers->getSize();
-        $this->getTask()->setMaxValue($max);
+        ////$this->getTask()->setMaxValue($max);
 
         $limit = 200000;
         $page = 1;
@@ -310,7 +412,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
                 $toFill1['is_customer'] = 0;
                 if (!$item->hasData('uk')) {
                     $msg = sprintf("FATAL ERROR, %s customer has no UK record!", $item->getData('subscriber_email'));
-                    $this->getTask()->addEvent($msg, true);
+                    //$this->getTask()->addEvent($msg, true);
                     throw new Exception($msg);
                 }
                 $toFill1['entity_id'] = $item->getData('uk');
@@ -353,7 +455,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
                 gzwrite($this->gz, $writer->outputMemory());
                 if ($counter % 2000 == 0) {
                     Mage::helper("contactlab_commons")->logNotice(sprintf("Exporting %6s / %-6s", $counter, $max));
-                    $this->getTask()->setProgressValue($counter);
+                    //$this->getTask()->setProgressValue($counter);
                 }
             }
             $this->_setUkIsExported();
@@ -437,11 +539,12 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
             }
             $writer->endElement();
             gzwrite($this->gz, $writer->outputMemory());
-
+/*
             $deletedEntity->setTaskId($this->getTask()->getTaskId())->save();
             if ($counter % 500 == 0) {
                 Mage::helper("contactlab_commons")->logNotice(sprintf("Exporting deleted %6s / %-6s", $counter, $max));
             }
+            */
         }
     }
 
@@ -461,7 +564,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
      * @return bool
      */
     private function _mustExportAddress($addressType) {
-        return $this->getTask()->getConfigFlag("contactlab_subscribers/global/export_" . $addressType . "_address");
+        return Mage::getStoreConfigFlag("contactlab_subscribers/global/export_" . $addressType . "_address");
     }
 
     /**
@@ -545,7 +648,9 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
     private function _fillCustomerGroupAttributes(array &$toFill, Varien_Object $item)
     {
         $toFill['customer_group_id'] = $item->getData('customer_group_id');
-        $toFill['customer_group_name'] = $item->getData('customer_group_name');        
+        $toFill['customer_group_name'] = $item->getData('customer_group_name');
+        //FIX
+        $toFill['created_at'] = $item->getData('created_at');
     }
 
     /**
@@ -625,7 +730,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
             // Ok, will export everything
             return;
         }
-        $lastExport = $this->getTask()->getConfig('contactlab_subscribers/global/last_export');
+        $lastExport = Mage::getStoreConfig('contactlab_subscribers/global/last_export');
         if (empty($lastExport)) {
             // Ok, will export everything, no last import saved.
             return;
@@ -663,7 +768,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
             // Ok, will export everything
             return $w;
         }
-        $lastExport = $this->getTask()->getConfig('contactlab_subscribers/global/last_export');
+        $lastExport = Mage::getStoreConfig('contactlab_subscribers/global/last_export');
         if (empty($lastExport)) {
             // Ok, will export everything, no last import saved.
             return $w;
@@ -709,7 +814,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
      * @param string $type
      */
     private function _addAddressToSelect(Varien_Data_Collection_Db $collection, $type) {
-        if (!$this->getTask()->getConfigFlag("contactlab_subscribers/global/export_" . $type . "_address")) {
+        if (!Mage::getStoreConfigFlag("contactlab_subscribers/global/export_" . $type . "_address")) {
             return;
         }
         $collection->getSelect()->joinLeft(
@@ -796,15 +901,21 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
      * @return bool
      */
     private function _mustExportNotSubscribed() {
-        return $this->getTask()->getConfigFlag("contactlab_subscribers/global/export_not_subscribed");
+        return Mage::getStoreConfigFlag("contactlab_subscribers/global/export_not_subscribed");
     }
 
     /**
      * Do I have to reset export dates before export?
      * @return bool
      */
+    /*
     private function _mustResetExportDates() {
-        return $this->getTask()->getConfigFlag("contactlab_subscribers/global/reset_export_dates_before_next_export");
+        return Mage::getStoreConfigFlag("contactlab_subscribers/global/reset_export_dates_before_next_export");
+    }
+    */
+    
+    private function _mustResetExportDates() {
+    	return Mage::getStoreConfig("contactlab_subscribers/global/reset_export_dates_before_next_export");
     }
 
     /**
@@ -836,7 +947,7 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
 
     /** Get subscription flag name. */
     public function getSubscribedFlagName() {
-        return $this->getTask()->getConfig("contactlab_subscribers/global/subscribed_flag_name");
+        return Mage::getStoreConfig("contactlab_subscribers/global/subscribed_flag_name");
     }
 
     /**
@@ -904,8 +1015,13 @@ class Contactlab_Subscribers_Model_Exporter_Subscribers extends Contactlab_Commo
      * Get file name.
      * @return string
      */
+    /*
     protected function getFileName() {
-        return $this->getTask()->getConfig("contactlab_subscribers/global/export_filename");
+        return Mage::getStoreConfig("contactlab_subscribers/global/export_filename");
+    }
+    */
+    protected function getFileName() {
+    	return Mage::getStoreConfig("contactlab_subscribers/global/export_filename");
     }
 
     /**
