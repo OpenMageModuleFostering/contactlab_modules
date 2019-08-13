@@ -29,6 +29,14 @@ class Contactlab_Commons_Helper_Data extends Mage_Core_Helper_Abstract {
     }
 
     /**
+     * Get platform version.
+     * @return String
+     */
+    public function getPlatformVersion() {
+        return Mage::getStoreConfig('contactlab_commons/global/platform_version');
+    }
+
+    /**
      * Emergency: system is unusable
      */
     public function logEmerg($value) {
@@ -156,5 +164,50 @@ class Contactlab_Commons_Helper_Data extends Mage_Core_Helper_Abstract {
         $select->reset(Zend_Db_Select::COLUMNS);
 
         return sprintf('DELETE %s %s', $adapter->quoteIdentifier($table), $select->assemble());
+    }
+
+    /**
+     * Get module versions.
+     * @return \Varien_Data_Collection
+     */
+    public function getModulesVersion() {
+        $rv = new Varien_Data_Collection();
+        $count = 0;
+        foreach (Mage::getConfig()->getNode('modules')->children() as $moduleName => $moduleConfig) {
+            if (preg_match('/^Contactlab_.*/', $moduleName)) {
+                $item = new Varien_Object();
+                $item->setName(preg_replace('/^Contactlab_/', '', $moduleName))
+                    ->setVersion((string) $moduleConfig->version)
+                    ->setConfig($moduleConfig)
+                    ->setModuleName($moduleName)
+                    ->setDescription((string) $moduleConfig->description);
+                if ($count++ % 2 == 0) {
+                    $item->setClass("even");
+                }
+                $rv->addItem($item);
+            }
+        }
+        return $rv;
+    }
+
+    /**
+     * Log function call.
+     * @param String $functionName
+     * @param String $storeId
+     */
+    public function logCronCall($functionName, $storeId = false)
+    {
+        $pid = getmypid();
+        $uid = getmyuid();
+        $sapi = php_sapi_name();
+        if ($storeId !== false) {
+            $this->logInfo(sprintf(
+                "Function %s called. pid: %s, uid: %s, sapi: %s, store: %s.",
+                $functionName, $pid, $uid, $sapi, $storeId));
+        } else {
+            $this->logInfo(sprintf(
+                "Function %s called. pid: %s, uid: %s, sapi: %s.",
+                $functionName, $pid, $uid, $sapi));
+        }
     }
 }
