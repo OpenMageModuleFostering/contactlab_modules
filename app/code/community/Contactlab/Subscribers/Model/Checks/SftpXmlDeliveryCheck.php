@@ -34,8 +34,8 @@ class Contactlab_Subscribers_Model_Checks_SftpXmlDeliveryCheck extends Contactla
      * @return String
      */
     public function getDescription()
-    {
-        return "SFTP XmlDelivery test";
+    {        
+        return "SFTP XmlDelivery test". ((Mage::getStoreConfig("contactlab_template/queue/export_remote_path")) ? " (path: ".Mage::getStoreConfig("contactlab_template/queue/export_remote_path").")" : "");
     }
 
     /**

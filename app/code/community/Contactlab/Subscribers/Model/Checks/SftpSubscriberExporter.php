@@ -35,7 +35,7 @@ class Contactlab_Subscribers_Model_Checks_SftpSubscriberExporter extends Contact
      */
     public function getDescription()
     {
-        return "SFTP Subscriber Exporter test";
+        return "SFTP Subscriber Exporter test". ((Mage::getStoreConfig("contactlab_commons/connection/export_remote_path")) ? " (path: ".Mage::getStoreConfig("contactlab_commons/connection/export_remote_path").")" : "");
     }
 
     /**
