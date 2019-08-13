@@ -3,6 +3,8 @@
 /**
  * Contactlab template model newsletter processor filter abstract.
  *
+ * @method bool getSendToAllCustomers()
+ * @method Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract setSendToAllCustomers($value)
  * @abstract
  */
 abstract class Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract
@@ -10,18 +12,16 @@ abstract class Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract
         implements Contactlab_Template_Model_Newsletter_Processor_Filter_Interface {
 
     /**
-     * Set store id.
-     *
-     * @param String $storeId
-     * @return $this
+     * Set Store Id.
+     * @param String $value
+     * @return mixed
      */
     public function setStoreId($storeId) {
         return parent::setStoreId($storeId);
     }
 
     /**
-     * Get store id.
-     *
+     * Get Store Id.
      * @return string
      */
     public function getStoreId() {
@@ -41,6 +41,8 @@ abstract class Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract
      * Get offset where.
      *
      * @param array $parameters
+     * @param string $min
+     * @param string $max
      * @return string
      */
     public function getOffsetWhere(array $parameters, $min = 'min', $max = 'max') {
@@ -61,6 +63,8 @@ abstract class Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract
      * Get offset where.
      *
      * @param array $parameters
+     * @param string $min
+     * @param string $max
      * @return string
      */
     public function getOffsetWhereQty(array $parameters, $min = 'min', $max = 'max') {
@@ -98,9 +102,10 @@ abstract class Contactlab_Template_Model_Newsletter_Processor_Filter_Abstract
 
     /**
      * Is this collection a customer collection?
-     * @param Mage_Core_Model_Resource_Db_Collection_Abstract $collection
+     * @param Varien_Data_Collection_Db $collection
+     * @return bool
      */
-    public function isCustomerCollection($collection) {
+    public function isCustomerCollection(Varien_Data_Collection_Db $collection) {
         return $collection instanceof Mage_Customer_Model_Resource_Customer_Collection;
     }
 

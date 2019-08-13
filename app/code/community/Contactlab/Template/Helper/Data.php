@@ -1,20 +1,24 @@
 <?php
 
-/** Template helper. */
+/**
+ * Template helper.
+ * Manages template scan.
+ */
 class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
 
     /**
      * Scan for template to be sent.
      *
-     * @param string $storeId = 0
+     * @param int|string $storeId = 0
      * @param string $debugAddress
+     * @param bool $excludeTest Exclude test mode templates
      * @return array
      */
-    public function scan($storeId = 0, $debugAddress = null) {
+    public function scan($storeId = 0, $debugAddress = null, $excludeTest = true) {
         $rv = array();
         /* @var $templates Mage_Newsletter_Model_Resource_Template_Collection */
         $templates = Mage::getResourceModel("newsletter/template_collection")
-            ->loadActiveTemplatesForCron();
+            ->loadActiveTemplatesForCron($storeId, $excludeTest);
 
         // $helper->logDebug("Scan " . $templates->count() . " templates found");
         $info = array();
@@ -22,6 +26,7 @@ class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
             $this->addSessionWarning("No <strong>templates</strong> found.");
         } else {
             $message = "Scanning <strong>" . $templates->count() . " templates</strong> found: ";
+            /** @var $template Contactlab_Template_Model_Newsletter_Template */
             foreach ($templates as $template) {
                 /* @var $template Contactlab_Template_Model_Newsletter_Template */
                 $message .= $template->getTemplateSubject() . ", ";
@@ -64,7 +69,7 @@ class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
     /**
      * Is this store enabled for sending in cron?
      * @param Mage_Core_Model_Store $store
-     * @return void
+     * @return boolean
      */
     public function isStoreEnabled(Mage_Core_Model_Store $store) {
         return Mage::getStoreConfigFlag('contactlab_template/global/enabled', $store);
@@ -78,7 +83,10 @@ class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
      * @param Contactlab_Commons_Model_Task $parentTask
      * @param string $xmlFile
      * @param string $storeId
+     * @param int $queueId
      * @return string
+     * @throws Exception
+     * @throws Zend_Exception
      */
     public function checkNewsletterQueueReport(Contactlab_Commons_Model_Task $task,
             Contactlab_Commons_Model_Task $parentTask, $xmlFile, $storeId, $queueId) {
@@ -106,7 +114,7 @@ class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
 
     /**
      * Add session message.
-     * @param type $message
+     * @param String $message
      */
     public function addSessionMessage($message) {
         /* @var $session Mage_Adminhtml_Model_Session */
@@ -118,7 +126,7 @@ class Contactlab_Template_Helper_Data extends Mage_Core_Helper_Abstract {
 
     /**
      * Add session message.
-     * @param type $message
+     * @param String $message
      */
     public function addSessionWarning($message) {
         /* @var $session Mage_Adminhtml_Model_Session */

@@ -47,6 +47,11 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         }
     }
     
+    /**
+     * @param Mage_Customer_Model_Customer $customer
+     * @return Mage_Core_Model_Abstract|null
+     * @throws Exception
+     */
     public function doUpdateCustomerStats(Mage_Customer_Model_Customer $customer) {
         $stats = Mage::getModel('contactlab_subscribers/stats')
                 ->getCollection()
@@ -65,7 +70,10 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         return $rv;
     }
 
-    /** Add clear statistics task to queue. */
+    /**
+     * Add clear statistics task to queue.
+     * @return Contactlab_Commons_Model_Task
+     */
     public function addClearStatsQueue() {
         return Mage::getModel("contactlab_commons/task")
                 ->setTaskCode("ClearStatisticsTask")
@@ -124,13 +132,23 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         Mage::helper("contactlab_commons")->flushDbProfiler();
     }
     
-    /** Unsubscribe email. */
-    public function unsubscribe(Contactlab_Commons_Model_Task $task, $email, $uk, $datetime, $logit = false) {
+    /** Unsubscribe email.
+     * @param Contactlab_Commons_Model_Task $task
+     * @param $email
+     * @param $uk
+     * @param $datetime
+     * @param bool $logIt
+     * @return bool
+     */
+    public function unsubscribe(Contactlab_Commons_Model_Task $task, $email, $uk, $datetime, $logIt = false) {
         if (!empty($uk)) {
             // $uk, int value of xml string content, not empty if it's a number > 0
+            /** @var $ukModel Contactlab_Subscribers_Model_Uk */
             $ukModel = Mage::getModel('contactlab_subscribers/uk')->load($uk);
             if ($ukModel->hasEntityId() && $ukModel->hasSubscriberId()) {
-                $model = Mage::getModel("newsletter/subscriber")->load($ukModel->getSubscriberId());
+                /** @var $model Contactlab_Subscribers_Model_Newsletter_Subscriber */
+                $model = Mage::getModel("newsletter/subscriber")
+                    ->load($ukModel->getSubscriberId());
             }
         }
         // 03/02/2015 - Disabled match by email address
@@ -144,12 +162,11 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
             if (!$this->_checkCanUnsubscribe($task, $model, $datetime)) {
                 return false;
             }
-            $model
-                ->setStatus(Mage_Newsletter_Model_Subscriber::STATUS_UNSUBSCRIBED)
-                ->setLastSubscribedAt(NULL)
-                ->save();
-            if ($logit) {
-                Mage::helper('contactlab_commons')->logTrace("$email has been unsubscribed");
+            $model->setStatus(Mage_Newsletter_Model_Subscriber::STATUS_UNSUBSCRIBED);
+            $model->setLastSubscribedAt(NULL);
+            $model->save();
+            if ($logIt) {
+                Mage::helper('contactlab_commons')->logNotice("$email has been unsubscribed");
             }
             return true;
         } else {
@@ -160,9 +177,13 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
 
     /**
      * If the subscriber has subscribed after ContactlLab subscription, wont do it!
+     * @param Contactlab_Commons_Model_Task $task
+     * @param Contactlab_Subscribers_Model_Newsletter_Subscriber $subscriber
+     * @param $datetime
+     * @return bool
      */
     private function _checkCanUnsubscribe(Contactlab_Commons_Model_Task $task,
-            Mage_Newsletter_Model_Subscriber $subscriber,
+            Contactlab_Subscribers_Model_Newsletter_Subscriber $subscriber,
             $datetime) {
         if (!$subscriber->isSubscribed()) {
             $task->addEvent(sprintf("\"%s\" is already unsubscribed", $subscriber->getEmail()));
@@ -198,10 +219,17 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         return $dtz->getOffset(new DateTime("now", $dtz));
     }
 
-    /** Update subscriber status via SOAP.*/
+    /** Update subscriber status via SOAP.
+     * @param $email
+     * @param $id
+     * @param $isSubscribed
+     * @param $storeId
+     * @param bool $queue
+     * @return $this
+     */
     public function updateSubscriberStatus($email, $id, $isSubscribed, $storeId, $queue = true) {
         if ($this->_skipUnsubscribeSoapCall) {
-            return;
+            return $this;
         }
         if (!Mage::getStoreConfigFlag("contactlab_subscribers/global/soap_call_set_subscribed", $storeId)) {
             return $this;
@@ -209,6 +237,7 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         
         try {
             Mage::helper("contactlab_commons")->logNotice("updateSubscriberStatus($email, $id, $isSubscribed, $storeId, $queue)");
+            /** @var $call Contactlab_Subscribers_Model_Soap_SetSubscriptionStatus */
             $call = Mage::getModel('contactlab_subscribers/soap_setSubscriptionStatus');
             $call->setStoreId($storeId);
             $call->setEntityId($id);
@@ -227,6 +256,14 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         return $this;
     }
 
+    /**
+     * Queue update subscriber status.
+     * @param $email String
+     * @param $id int
+     * @param $isSubscribed bool
+     * @param $storeId int
+     * @throws Exception
+     */
     private function _doQueueUpdateSubscriberStatus($email, $id, $isSubscribed, $storeId) {
         $data = new stdClass();
         $data->email = $email;
@@ -270,4 +307,52 @@ class Contactlab_Subscribers_Helper_Data extends Mage_Core_Helper_Abstract {
         $this->_skipUnsubscribeSoapCall = true;
     }
 
+    /**
+     * Send notification email.
+     * @param $recipient
+     * @return $this
+     * @throws Exception
+     * @throws Mage_Core_Exception
+     */
+    public function sendSubscriberEditEmail($recipient)
+    {
+        if (!Mage::getStoreConfigFlag('contactlab_subscribers/modify_email/enable')) {
+            return $this;
+        }
+        $translate = Mage::getSingleton('core/translate');
+
+        $translate->setTranslateInline(false);
+        $mailTemplate = Mage::getModel('core/email_template');
+
+        $templateId = Mage::getStoreConfig('contactlab_subscribers/modify_email/send_email_template',
+            Mage::app()->getStore()->getId());
+        $senderEmail = Mage::getStoreConfig('contactlab_subscribers/modify_email/email_sender');
+        $senderName = Mage::getStoreConfig('contactlab_subscribers/modify_email/email_sender_name');
+
+        /** @var $subscriber Contactlab_Subscribers_Model_Newsletter_Subscriber */
+        $subscriber = Mage::getModel('newsletter/subscriber')->load($recipient, 'subscriber_email');
+        if (!$subscriber->hasSubscriberConfirmCode()) {
+            $subscriber->setSubscriberConfirmCode($subscriber->randomSequence())->save();
+        }
+        $params = array('id' => $subscriber->getSubscriberId(), 'hash' => $subscriber->getSubscriberConfirmCode());
+
+        //get the store associated with the subscriber and append it to final URL
+        if ($subscriber->hasStoreId()) {
+            $store = '?__store=' . Mage::getModel('core/store')->load($subscriber->getStoreId())->getCode();
+        } else {
+            $store = '';
+        }
+
+        $mailTemplate->sendTransactional(
+            $templateId,
+            array('name' => $senderName, 'email' => $senderEmail),
+            trim($recipient),
+            Mage::helper('contactlab_commons')->__('Modify your data'),
+            array('url' => Mage::getUrl('contactlab_subscribers/edit', $params) . $store),
+            Mage::app()->getStore()->getId()
+        );
+        $translate->setTranslateInline(true);
+
+        return $this;
+    }
 }

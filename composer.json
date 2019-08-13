@@ -1,9 +1,9 @@
 {
     "name": "OpenMageModuleFostering/Contactlab_Modules",
     "type": "magento-module",
-    "license": "OSL-3.0",
+    "license": "OSL-v.-3.0",
     "homepage": "",
-    "description": "The enabler to engage online shoppers via digital direct marketing campaigns",
+    "description": "The enabler to engage online shoppers via digital direct marketing campaigns. Community and Enterprise Edition",
     "authors": [
     {
         "name": "ContactLab",

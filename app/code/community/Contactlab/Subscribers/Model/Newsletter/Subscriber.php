@@ -2,6 +2,15 @@
 
 /**
  * Newsletter subscribers model, get and set from SOAP.
+ * @method int getSubscriberId()
+ * @method int getLastSubscribedAt()
+ * @method bool hasSubscriberId()
+ * @method bool hasSubscriberConfirmCode()
+ * @method bool hasStoreId()
+ * @method bool hasLastSubscribedAt()
+ * @method array getProductIds()
+ *
+ * @method Contactlab_Subscribers_Model_Newsletter_Subscriber setLastSubscribedAt($value)
  */
 class Contactlab_Subscribers_Model_Newsletter_Subscriber extends Mage_Newsletter_Model_Subscriber {
     // Is customer subscribed?
@@ -38,6 +47,19 @@ class Contactlab_Subscribers_Model_Newsletter_Subscriber extends Mage_Newsletter
         return parent::isSubscribed();
     }
 
+    
+    /**
+     * Load subscriber data from resource model by email
+     *
+     * @param int $subscriberId
+     */
+    public function loadByEmail($subscriberEmail, $storeId=null)
+    {
+    	$this->addData(Mage::getModel('newsletter_resource/subscriber')->loadByEmail($subscriberEmail, $storeId));
+    	return $this;
+    }
+    
+    
     /**
      * Load subscriber by customer
      *

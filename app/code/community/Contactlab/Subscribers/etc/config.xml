@@ -2,8 +2,8 @@
 <config>
     <modules>
         <Contactlab_Subscribers>
-            <version>0.8.17</version>
-            <description>Subscriber sync Magento/ContactLab and ContactLab/Magento</description>
+            <version>1.0.1</version>
+            <description>Subscriber sync Magento/ContactLab and ContactLab/Magento.</description>
         </Contactlab_Subscribers>
     </modules>
     <global>
@@ -43,6 +43,11 @@
                     <subscriber>Contactlab_Subscribers_Model_Newsletter_Subscriber</subscriber>
                 </rewrite>
             </newsletter>
+            <newsletter_resource>
+                <rewrite>
+                    <subscriber>Contactlab_Subscribers_Model_Resource_Newsletter_Subscriber</subscriber>
+                </rewrite>
+            </newsletter_resource>
             <contactlab_subscribers>
                 <class>Contactlab_Subscribers_Model</class>
                 <resourceModel>contactlab_subscribers_resource</resourceModel>
@@ -62,10 +67,41 @@
                     <newsletter_subscriber_export>
                         <table>contactlab_subscribers_newsletter_subscriber_export</table>
                     </newsletter_subscriber_export>
+                    <newsletter_subscriber_fields>
+                        <table>contactlab_subscribers_newsletter_subscriber_fields</table>
+                    </newsletter_subscriber_fields>
                 </entities>
             </contactlab_subscribers_resource>
         </models>
         <events>
+            <contactlab_subscribers_subscriber_update>
+                <observers>
+                    <contactlab_subscribers_subscriber_update_fields>
+                        <type>singleton</type>
+                        <class>contactlab_subscribers/observer_fields</class>
+                        <method>updateFields</method>
+                    </contactlab_subscribers_subscriber_update_fields>
+                </observers>
+            </contactlab_subscribers_subscriber_update>
+            <newsletter_subscriber_save_after>
+                <observers>
+                    <contactlab_subscribers_newsletter_subscriber_save_after_fields>
+                        <type>singleton</type>
+                        <class>contactlab_subscribers/observer_fields</class>
+                        <method>afterSubscriberSaved</method>
+                    </contactlab_subscribers_newsletter_subscriber_save_after_fields>
+                </observers>
+            </newsletter_subscriber_save_after>
+            <!-- Driven by cascade database -->
+            <!--newsletter_subscriber_delete_before>
+                <observers>
+                    <contactlab_subscribers_newsletter_subscriber_delete_before_fields>
+                        <type>singleton</type>
+                        <class>contactlab_subscribers/observer_fields</class>
+                        <method>beforeSubscriberDeleted</method>
+                    </contactlab_subscribers_newsletter_subscriber_delete_before_fields>
+                </observers>
+            </newsletter_subscriber_delete_before-->
             <sales_order_save_after>
                 <observers>
                     <contactlab_commons_model_delete_after>
@@ -94,16 +130,25 @@
                 </observers>
             </controller_front_send_response_after>
         </events>
+        <template>
+            <email>
+                <contactlab_subscribers_modify_email_send_email_template translate="label" module="contactlab_subscribers">
+                    <label>Modify subscriber data email</label>
+                    <file>contactlab_subscribers/modify_subscriber_data.html</file>
+                    <type>html</type>
+                </contactlab_subscribers_modify_email_send_email_template>
+            </email>
+        </template>
     </global>
     <admin>
         <routers>
-            <contactlab_subscribers>
-                <use>admin</use>
+            <adminhtml>
                 <args>
-                    <module>Contactlab_Subscribers</module>
-                    <frontName>contactlab_subscribers</frontName>
+                    <modules>
+                        <contactlab_subscribers before="Mage_Adminhtml">Contactlab_Subscribers_Adminhtml</contactlab_subscribers>
+                    </modules>
                 </args>
-            </contactlab_subscribers>
+            </adminhtml>
         </routers>
     </admin>
     <adminhtml>
@@ -196,9 +241,44 @@
                     </contactlab_subscribers_newsletter_controller_action_postdispatch>
                 </observers>
             </controller_action_postdispatch>
+
+			<adminhtml_block_html_before>
+                <observers>
+                    <contactlab_subscribers_newsletter_fields_remove_grid>
+                        <type>model</type>
+                        <class>contactlab_subscribers/newsletter_subscribers_observer</class>
+                        <method>removeOldColumns</method>
+                    </contactlab_subscribers_newsletter_fields_remove_grid>
+                </observers>
+             </adminhtml_block_html_before>
+            <core_block_abstract_prepare_layout_after>
+                <observers>
+                    <contactlab_subscribers_newsletter_fields_add_grid>
+                        <type>model</type>
+                        <class>contactlab_subscribers/newsletter_subscribers_observer</class>
+                        <method>appendCustomColumns</method>
+                    </contactlab_subscribers_newsletter_fields_add_grid>
+                </observers>
+            </core_block_abstract_prepare_layout_after>
+            <core_collection_abstract_load_before>
+                <observers>
+                    <contactlab_subscribers_newsletter_fields_add_grid>
+                        <type>model</type>
+                        <class>contactlab_subscribers/newsletter_subscribers_observer</class>
+                        <method>appendCustomAttributes</method>
+                    </contactlab_subscribers_newsletter_fields_add_grid>
+                </observers>
+            </core_collection_abstract_load_before>
         </events>
     </adminhtml>
     <frontend>
+        <layout>
+            <updates>
+                <contactlab_subscribers>
+                    <file>contactlab/subscribers.xml</file>
+                </contactlab_subscribers>
+            </updates>
+        </layout>
         <events>
             <newsletter_subscriber_save_after>
                 <observers>
@@ -263,6 +343,15 @@
                     </contactlab_subscribers_newsletter_subscriber_save_after>
                 </observers>
             </newsletter_subscriber_save_after>
+            <controller_action_predispatch>
+                <observers>
+                    <contactlab_subscribers_newsletter_controller_action_predispatch>
+                        <type>singleton</type>
+                        <class>contactlab_subscribers/observer_fields</class>
+                        <method>controllerActionPreDispatch</method>
+                    </contactlab_subscribers_newsletter_controller_action_predispatch>
+                </observers>
+            </controller_action_predispatch>
             <controller_action_postdispatch>
                 <observers>
                     <contactlab_subscribers_newsletter_controller_action_postdispatch>
@@ -282,11 +371,20 @@
                 </observers>
             </contactlab_subscribers_uk_subscriber_promoted_to_customer>
         </events>
+        <routers>
+            <contactlab_subscribers>
+                <use>standard</use>
+                <args>
+                    <module>Contactlab_Subscribers</module>
+                    <frontName>contactlab</frontName>
+                </args>
+            </contactlab_subscribers>
+        </routers>
     </frontend>
     <default>
         <contactlab_subscribers>
             <global>
-                <enabled>0</enabled>
+                <!--enabled>0</enabled>
                 <debug>0</debug>
                 <export_filename>subscribers_{Ymd}.xml</export_filename>
                 <import_filename>event_info_{Ymd}.xml</import_filename>
@@ -296,10 +394,10 @@
                 <check_uk_before_export>1</check_uk_before_export>
                 <subscribed_flag_name>__cls1</subscribed_flag_name>
                 <export_not_subscribed>1</export_not_subscribed>
-                <reset_export_dates_before_next_export>0</reset_export_dates_before_next_export>
+                <reset_export_dates_before_next_export>0</reset_export_dates_before_next_export-->
             </global>
             <queue>
-                <contactlab_subscribers_model_task_exportsubscribersrunner_interval>15</contactlab_subscribers_model_task_exportsubscribersrunner_interval>
+                <!--contactlab_subscribers_model_task_exportsubscribersrunner_interval>15</contactlab_subscribers_model_task_exportsubscribersrunner_interval>
                 <contactlab_subscribers_model_task_exportsubscribersrunner_retries>5</contactlab_subscribers_model_task_exportsubscribersrunner_retries>
                 <contactlab_subscribers_model_task_importsubscribersrunner_interval>10</contactlab_subscribers_model_task_importsubscribersrunner_interval>
                 <contactlab_subscribers_model_task_importsubscribersrunner_retries>3</contactlab_subscribers_model_task_importsubscribersrunner_retries>
@@ -310,11 +408,11 @@
                 <contactlab_subscribers_model_task_startsubscriberdataexchangerunner_interval>5</contactlab_subscribers_model_task_startsubscriberdataexchangerunner_interval>
                 <contactlab_subscribers_model_task_startsubscriberdataexchangerunner_retries>5</contactlab_subscribers_model_task_startsubscriberdataexchangerunner_retries>
                 <contactlab_subscribers_model_task_updatesubscriberstatusrunner_interval>1</contactlab_subscribers_model_task_updatesubscriberstatusrunner_interval>
-                <contactlab_subscribers_model_task_updatesubscriberstatusrunner_retries>10</contactlab_subscribers_model_task_updatesubscriberstatusrunner_retries>
+                <contactlab_subscribers_model_task_updatesubscriberstatusrunner_retries>10</contactlab_subscribers_model_task_updatesubscriberstatusrunner_retries-->
             </queue>
             <stats>
-                <period_1>30</period_1>
-                <period_2>120</period_2>
+                <!--period_1>30</period_1>
+                <period_2>120</period_2-->
             </stats>
         </contactlab_subscribers>
     </default>
@@ -328,6 +426,13 @@
             </contactlab_subscribers_import_subscribers>
         </jobs>
     </crontab>
+    <phpunit>
+        <suite>
+            <modules>
+                <Contactlab_Subscribers/>
+            </modules>
+        </suite>
+    </phpunit>
     <!--crontab>
         <jobs>
             <contactlab_subscribers_stats_recalc>

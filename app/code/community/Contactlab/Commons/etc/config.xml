@@ -2,8 +2,8 @@
 <config>
     <modules>
         <Contactlab_Commons>
-            <version>0.8.16</version>
-            <description>Magento/ContactLab Common functions</description>
+            <version>1.0.1</version>
+            <description>Magento/ContactLab Common functions.</description>
         </Contactlab_Commons>
     </modules>
     <global>
@@ -79,6 +79,13 @@
                     <frontName>contactlab_commons</frontName>
                 </args>
             </contactlab_commons>
+            <adminhtml>
+                <args>
+                    <modules>
+                        <contactlab_commons before="Mage_Adminhtml">Contactlab_Commons_Adminhtml</contactlab_commons>
+                    </modules>
+                </args>
+            </adminhtml>
         </routers>
     </admin>
     <adminhtml>
@@ -135,24 +142,28 @@
     <default>
         <contactlab_commons>
             <global>
-                <days_of_old_tasks>3</days_of_old_tasks>
-                <debug>0</debug>
-                <platform_version>2.2.3</platform_version>
+                <!--days_of_old_tasks>3</days_of_old_tasks>
+                <debug>0</debug-->
+                <platform_version>2.4.1</platform_version>
             </global>
             <connection>
-                <type>1</type>
+                <!--type>1</type>
                 <import_local_path>/tmp</import_local_path>
                 <export_local_path>/tmp</export_local_path>
                 <remote_server>sftp-clab.housing.tomato.it</remote_server>
                 <import_remote_path>incoming/exporter</import_remote_path>
-                <export_remote_path>incoming/updater</export_remote_path>
-                <!-- TODO Remove in prod -->
-                <sftp_username>magento-test</sftp_username>
-                <sftp_password></sftp_password>
+                <export_remote_path>incoming/updater</export_remote_path-->
             </connection>
             <soap>
-            	<wsdl_url><![CDATA[https://soap.contactlab.it/soap/services?wsdl]]></wsdl_url>
+            	<!--wsdl_url><![CDATA[https://soap.contactlab.it/soap/services?wsdl]]></wsdl_url-->
             </soap>
         </contactlab_commons>
     </default>
+    <phpunit>
+        <suite>
+            <modules>
+                <Contactlab_Commons/>
+            </modules>
+        </suite>
+    </phpunit>
 </config>

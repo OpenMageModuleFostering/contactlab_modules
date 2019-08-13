@@ -27,8 +27,9 @@ class Contactlab_Template_Model_Task_Observer {
      * @return void
      */
     public function loadOldTasks(Varien_Event_Observer $observer) {
-        $collection = $observer->getCollection();
-        $collection->getSelect()->orWhere("status = ? and main_table.task_id not in (select task_id from newsletter_queue)",
+    	$tablePrefix = (string) Mage::getConfig()->getTablePrefix();
+    	$collection = $observer->getCollection();
+        $collection->getSelect()->orWhere("status = ? and main_table.task_id not in (select task_id from {$tablePrefix}newsletter_queue)",
             Contactlab_Commons_Model_Task::STATUS_HIDDEN);
     }
 
@@ -56,7 +57,7 @@ class Contactlab_Template_Model_Task_Observer {
      * @return void
      */
     private function _deleteNewsletterQueue(Contactlab_Commons_Model_Task $task) {
-        $resource = Mage::getResourceModel('newsletter/queue');
+        /* @var $adapter Varien_Db_Adapter_Pdo_Mysql */
         $adapter = Mage::getSingleton('core/resource')->getConnection('core_write');
 
         $collection = Mage::getResourceModel('newsletter/queue_collection')
