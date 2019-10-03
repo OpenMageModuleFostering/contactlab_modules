@@ -1,16 +1,19 @@
 {
-    "name": "OpenMageModuleFostering/Contactlab_Modules",
+    "name": "OpenMageModuleFostering\/Contactlab_Modules",
     "type": "magento-module",
     "license": "OSL-v.-3.0",
     "homepage": "",
     "description": "The enabler to engage online shoppers via digital direct marketing campaigns. Community and Enterprise Edition",
     "authors": [
-    {
-        "name": "ContactLab",
-        "email": "magento@contactlab.com"
-    }
-],
+        {
+            "name": "ContactLab",
+            "email": "magento@contactlab.com"
+        }
+    ],
     "suggest": {
-        "magento-hackathon/magento-composer-installer": "*"
-    }
+        "magento-hackathon\/magento-composer-installer": "*"
+    },
+    "keywords": [
+        "openmage-module"
+    ]
 }
